@@ -22,9 +22,8 @@ import argparse
 import socket
 from typing import Tuple, Dict, Optional
 import select
-from icmp_utils import ICMP_ECHO_REQUEST, ICMPPacket, build_icmp_request, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, \
-    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, PacketManager
-from socket_utils import create_icmp_socket
+from utils import ICMP_ECHO_REQUEST, ICMPPacket, build_icmp_request, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, \
+    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, PacketManager, create_icmp_socket
 
 
 class Connection:

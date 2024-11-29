@@ -25,9 +25,9 @@ from typing import Tuple, Dict
 
 import select
 
-from icmp_utils import ICMP_ECHO_REPLY, ICMPPacket, ICMP_ECHO_REQUEST, ICMP_BUFFER_SIZE, \
-    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, STARTING_SEQUENCE, PacketManager, build_icmp_request
-from socket_utils import create_tcp_server_socket, create_icmp_socket
+from utils import ICMP_ECHO_REPLY, ICMPPacket, ICMP_ECHO_REQUEST, ICMP_BUFFER_SIZE, \
+    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, STARTING_SEQUENCE, PacketManager, build_icmp_request, \
+    create_tcp_server_socket, create_icmp_socket
 
 
 class Connection:
