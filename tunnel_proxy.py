@@ -32,7 +32,7 @@ class Connection:
     """
 
     def __init__(self, tcp_sock: socket.socket, sequence: int, expected_seq: int, packet_manager: PacketManager,
-                 icmp_address: Tuple[str, int], tcp_address: Tuple[str, int]) -> None:
+                 icmp_address: Tuple[str, int]) -> None:
         """
         Initialize a new Connection instance.
 
@@ -41,7 +41,6 @@ class Connection:
         :param expected_seq: The next expected sequence number for incoming packets.
         :param packet_manager: A PacketManager instance for managing ICMP packets.
         :param icmp_address: The address of the ICMP connection.
-        :param tcp_address: The address of the TCP connection.
         """
         self.tcp_sock: socket.socket = tcp_sock
         self.sequence: int = sequence
@@ -49,7 +48,6 @@ class Connection:
         self.packet_manager: PacketManager = packet_manager
         self.reorder_buffer: Dict[int, bytes] = {}
         self.icmp_address: Tuple[str, int] = icmp_address
-        self.tcp_address: Tuple[str, int] = tcp_address
 
 
 class ICMPTunnelProxy:
@@ -77,7 +75,7 @@ class ICMPTunnelProxy:
         """
         try:
             data: bytes = sock.recv(self.buffer_size)
-            key = self.get_key_connection_by_tcp_address(sock.getsockname())
+            key = self.get_key_connection_by_tcp_socket(sock)
             if data:
                 connection = self.connections[key]
                 # Build an ICMP packet with the received TCP data
@@ -111,6 +109,9 @@ class ICMPTunnelProxy:
                 print(f"Received ICMP packet from: {sender_address}")
                 key: Tuple[str, int] = (socket.inet_ntoa(icmp_packet.local_ip), icmp_packet.local_port)
                 if icmp_packet.packet_id == ACK_PACKET_ID:
+                    if key not in self.connections.keys():
+                        print(f"No TCP connection found for ICMP request to {key}")
+                        return
                     # Handle acknowledgment
                     self.connections[key].packet_manager.handle_ack(icmp_packet.sequence)
                 else:
@@ -126,7 +127,7 @@ class ICMPTunnelProxy:
                         client_socket.connect((socket.inet_ntoa(icmp_packet.remote_ip), icmp_packet.remote_port))
                         self.inputs.append(client_socket)
                         self.connections[key] = Connection(client_socket, icmp_packet.sequence, icmp_packet.sequence,
-                                                           PacketManager(), sender_address, client_socket.getsockname())
+                                                           PacketManager(), sender_address)
                     # Reorder packets and handle out-of-order delivery
                     if icmp_packet.sequence == self.connections[key].expected_seq:
                         self.connections[key].tcp_sock.send(icmp_packet.payload)
@@ -143,15 +144,15 @@ class ICMPTunnelProxy:
         except socket.error as e:
             print(f"Error handling ICMP data: {e}")
 
-    def get_key_connection_by_tcp_address(self, tcp_address: Tuple[str, int]) -> Optional[Tuple[str, int]]:
+    def get_key_connection_by_tcp_socket(self, tcp_sock: socket.socket) -> Optional[Tuple[str, int]]:
         """
         Retrieve the key for a connection based on its TCP address.
 
-        :param tcp_address: The TCP address of the connection.
+        :param tcp_sock: The socket of the connection.
         :return: The connection key if found, otherwise None.
         """
         for key, connection in self.connections.items():
-            if connection.tcp_address == tcp_address:
+            if connection.tcp_sock == tcp_sock:
                 return key
         return None
 
@@ -164,7 +165,7 @@ class ICMPTunnelProxy:
         sock.close()
         if sock in self.inputs:
             self.inputs.remove(sock)
-        key = self.get_key_connection_by_tcp_address(sock.getsockname())
+        key = self.get_key_connection_by_tcp_socket(sock)
         if key is not None:
             del self.connections[key]
 
