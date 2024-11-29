@@ -195,7 +195,7 @@ def parse_arguments() -> argparse.Namespace:
     """
     parser = argparse.ArgumentParser(description="ICMP Tunnel Proxy")
     parser.add_argument("--buffer-size", type=int, default=1024,
-                        help="Buffer size for socket operations (default: 1024).")
+                        help="Buffer size for tcp operations (default: 1024).")
     return parser.parse_args()
 
 

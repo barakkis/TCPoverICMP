@@ -208,7 +208,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--listen-port", type=int, default=8000,
                         help="Port to listen for TCP connections (default: 8000).")
     parser.add_argument("--buffer-size", type=int, default=1024,
-                        help="Buffer size for socket operations (default: 1024).")
+                        help="Buffer size for tcp operations (default: 1024).")
     return parser.parse_args()
 
 
