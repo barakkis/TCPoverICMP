@@ -33,10 +33,11 @@ ICMP_ECHO_REQUEST = 8  # ICMP type for Echo Request messages
 
 # Constants
 ICMP_BUFFER_SIZE = 65565  # Maximum buffer size for ICMP packets
-STARTING_SEQUENCE = 200  # Starting sequence number for packets
+MIN_STARTING_SEQUENCE = 0  # Minimum sequence number for packets
+MAX_STARTING_SEQUENCE = 200  # Maximum sequence number for packets
 DATA_PACKET_ID = 1  # Identifier for data packets
 ACK_PACKET_ID = 2  # Identifier for acknowledgment packets
-SOCKET_REUSE: int = 1  # Value for SO_REUSEADDR to allow address reuse
+SOCKET_REUSE = 1  # Value for SO_REUSEADDR to allow address reuse
 
 
 class PacketManager:

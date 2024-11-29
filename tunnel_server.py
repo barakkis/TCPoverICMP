@@ -20,14 +20,15 @@ Main Execution:
 """
 
 import argparse
+import random
 import socket
 from typing import Tuple, Dict
 
 import select
 
 from utils import ICMP_ECHO_REPLY, ICMPPacket, ICMP_ECHO_REQUEST, ICMP_BUFFER_SIZE, \
-    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, STARTING_SEQUENCE, PacketManager, build_icmp_request, \
-    create_tcp_server_socket, create_icmp_socket
+    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, MAX_STARTING_SEQUENCE, PacketManager, build_icmp_request, \
+    create_tcp_server_socket, create_icmp_socket, MIN_STARTING_SEQUENCE
 
 
 class Connection:
@@ -35,19 +36,18 @@ class Connection:
     Represents a ICMP tunnel client connection, including its state and packet management.
     """
 
-    def __init__(self, tcp_sock: socket.socket, sequence: int, expected_seq: int,
-                 packet_manager: PacketManager) -> None:
+    def __init__(self, tcp_sock: socket.socket, sequence: int, packet_manager: PacketManager) -> None:
         """
         Initialize a new Connection instance.
 
         :param tcp_sock: The socket for the client connection.
-        :param sequence: The current sequence number for outgoing packets.
-        :param expected_seq: The next expected sequence number for incoming packets.
+        :param sequence: The current sequence number for outgoing packets and the next expected sequence number for
+        incoming packets.
         :param packet_manager: A PacketManager instance for tracking and retransmitting packets.
         """
         self.tcp_sock: socket.socket = tcp_sock
         self.sequence: int = sequence
-        self.expected_seq: int = expected_seq
+        self.expected_seq: int = sequence
         self.packet_manager: PacketManager = packet_manager
         self.reorder_buffer: Dict[int, bytes] = {}
 
@@ -159,8 +159,8 @@ class ICMPTunnelServer:
         client_socket, client_address = sock.accept()
         print(f"New connection from {client_address}")
         self.inputs.append(client_socket)
-        self.connections[client_address] = Connection(client_socket, STARTING_SEQUENCE,
-                                                      STARTING_SEQUENCE, PacketManager())
+        sequence = random.randint(MIN_STARTING_SEQUENCE, MAX_STARTING_SEQUENCE)
+        self.connections[client_address] = Connection(client_socket, sequence, PacketManager())
 
     def cleanup_connection(self, sock: socket.socket) -> None:
         """
