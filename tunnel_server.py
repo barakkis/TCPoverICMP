@@ -28,7 +28,7 @@ import select
 
 from utils import ICMP_ECHO_REPLY, ICMPPacket, ICMP_ECHO_REQUEST, ICMP_BUFFER_SIZE, \
     ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, MAX_STARTING_SEQUENCE, PacketManager, build_icmp_request, \
-    create_tcp_server_socket, create_icmp_socket, MIN_STARTING_SEQUENCE
+    create_tcp_server_socket, create_icmp_socket, MIN_STARTING_SEQUENCE, calculate_checksum
 
 
 class Connection:
@@ -88,7 +88,8 @@ class ICMPTunnelServer:
         """
         try:
             data, sender_address = sock.recvfrom(ICMP_BUFFER_SIZE)
-            icmp_packet = ICMPPacket(data[20:])
+            icmp_data = data[20:]
+            icmp_packet = ICMPPacket(icmp_data)
 
             if icmp_packet.icmp_type == ICMP_ECHO_REPLY:
                 print("Received ICMP packet")
@@ -101,13 +102,18 @@ class ICMPTunnelServer:
                     self.connections[key].packet_manager.handle_ack(icmp_packet.sequence)
                 else:
                     # Send acknowledgment back to the sender
-                    send_icmp(self.icmp_sock, ICMP_ECHO_REQUEST, b'', sender_address,
-                              socket.inet_ntoa(icmp_packet.local_ip), icmp_packet.local_port,
-                              socket.inet_ntoa(icmp_packet.remote_ip), icmp_packet.remote_port, ACK_PACKET_ID,
-                              icmp_packet.sequence)
+                    received_checksum = calculate_checksum(icmp_data)
+                    if received_checksum == 0:
+                        send_icmp(self.icmp_sock, ICMP_ECHO_REQUEST, b'', sender_address,
+                                  socket.inet_ntoa(icmp_packet.local_ip), icmp_packet.local_port,
+                                  socket.inet_ntoa(icmp_packet.remote_ip), icmp_packet.remote_port, ACK_PACKET_ID,
+                                  icmp_packet.sequence)
+                    else:
+                        print(f"Error in Checksum to {icmp_packet.sequence} packet, drop it")
+                        return
                     print(icmp_packet.payload)
                     connection = self.connections[key]
-                    # Handle packet reordering
+                    # Reorder packets and handle out-of-order delivery
                     if icmp_packet.sequence == connection.expected_seq:
                         connection.tcp_sock.send(icmp_packet.payload)
                         connection.expected_seq += 1
