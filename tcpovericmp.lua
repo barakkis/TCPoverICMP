@@ -41,14 +41,13 @@ function my_protocol.dissector(buffer, pinfo, tree)
     local checksum_valid = (calculated_checksum == 0)
 
     -- Update the protocol column in the packet list
+    local icmp_message_type = "Unknown"
     if icmp_type == 8 then
-        pinfo.cols.protocol = "TCPoverICMP (Request)"
+        icmp_message_type= "Echo Request"
     elseif icmp_type == 0 then
-        pinfo.cols.protocol = "TCPoverICMP (Reply)"
-    else
-        pinfo.cols.protocol = "TCPoverICMP (Unknown)"
+        icmp_message_type = "Echo Reply"
     end
-
+    pinfo.cols.protocol = string.format("TCPoverICMP (%s)", icmp_message_type)
 
 
     -- Update the Info column
@@ -68,10 +67,10 @@ function my_protocol.dissector(buffer, pinfo, tree)
     local subtree = tree:add(my_protocol, buffer(), "TCP over ICMP Data")
 
     -- Add ICMP fields
-    subtree:add(my_protocol.fields.icmp_type, buffer(0, 1))
+    subtree:add(my_protocol.fields.icmp_type, buffer(0, 1)):append_text(string.format(" (%s)",icmp_message_type))
     subtree:add(my_protocol.fields.icmp_code, buffer(1, 1))
     subtree:add(my_protocol.fields.icmp_checksum, buffer(2, 2)):append_text(checksum_valid and " (Checksum Validity: Valid)" or " (Checksum Validity: Invalid)")
-    subtree:add(my_protocol.fields.icmp_id, buffer(4, 2))
+    subtree:add(my_protocol.fields.icmp_id, buffer(4, 2)):append_text(string.format(" (%s)",message_type))
     subtree:add(my_protocol.fields.icmp_seq, buffer(6, 2))
 
     -- Add local IP and port
