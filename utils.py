@@ -102,6 +102,30 @@ class PacketManager:
                     del self.pending_packets[seq_number]
 
 
+class Connection:
+    """
+    Represents a ICMP tunnel client connection, including its state and packet management.
+    """
+
+    def __init__(self, tcp_sock: socket.socket, sequence: int, packet_manager: PacketManager,
+                 icmp_address: Tuple[str, int]) -> None:
+        """
+        Initialize a new Connection instance.
+
+        :param tcp_sock: The socket for the client connection.
+        :param sequence: The current sequence number for outgoing packets and the next expected sequence number for
+        incoming packets.
+        :param packet_manager: A PacketManager instance for tracking and retransmitting packets.
+        :param icmp_address: The address of the ICMP connection.
+        """
+        self.tcp_sock: socket.socket = tcp_sock
+        self.sequence: int = sequence
+        self.expected_seq: int = sequence
+        self.packet_manager: PacketManager = packet_manager
+        self.reorder_buffer: Dict[int, bytes] = {}
+        self.icmp_address: Tuple[str, int] = icmp_address
+
+
 class ICMPPacket:
     """
     Represents an ICMP packet, with methods to parse and access its attributes.

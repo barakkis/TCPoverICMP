@@ -28,28 +28,7 @@ import select
 
 from utils import ICMP_ECHO_REPLY, ICMPPacket, ICMP_ECHO_REQUEST, ICMP_BUFFER_SIZE, \
     ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, MAX_STARTING_SEQUENCE, PacketManager, build_icmp_request, \
-    create_tcp_server_socket, create_icmp_socket, MIN_STARTING_SEQUENCE, calculate_checksum
-
-
-class Connection:
-    """
-    Represents a ICMP tunnel client connection, including its state and packet management.
-    """
-
-    def __init__(self, tcp_sock: socket.socket, sequence: int, packet_manager: PacketManager) -> None:
-        """
-        Initialize a new Connection instance.
-
-        :param tcp_sock: The socket for the client connection.
-        :param sequence: The current sequence number for outgoing packets and the next expected sequence number for
-        incoming packets.
-        :param packet_manager: A PacketManager instance for tracking and retransmitting packets.
-        """
-        self.tcp_sock: socket.socket = tcp_sock
-        self.sequence: int = sequence
-        self.expected_seq: int = sequence
-        self.packet_manager: PacketManager = packet_manager
-        self.reorder_buffer: Dict[int, bytes] = {}
+    create_tcp_server_socket, create_icmp_socket, MIN_STARTING_SEQUENCE, calculate_checksum, Connection
 
 
 class ICMPTunnelServer:
@@ -144,7 +123,7 @@ class ICMPTunnelServer:
                                             self.connections[sock.getpeername()].sequence)
                 self.connections[sock.getpeername()].packet_manager.track_packet(
                     self.connections[sock.getpeername()].sequence, packet)
-                self.icmp_sock.sendto(packet, self.tunnel_address)
+                self.icmp_sock.sendto(packet, self.connections[sock.getpeername()].icmp_address)
                 print(f"Packet {self.connections[sock.getpeername()].sequence} sent")
                 self.connections[sock.getpeername()].sequence += 1
             else:
@@ -166,7 +145,7 @@ class ICMPTunnelServer:
         print(f"New connection from {client_address}")
         self.inputs.append(client_socket)
         sequence = random.randint(MIN_STARTING_SEQUENCE, MAX_STARTING_SEQUENCE)
-        self.connections[client_address] = Connection(client_socket, sequence, PacketManager())
+        self.connections[client_address] = Connection(client_socket, sequence, PacketManager(), self.tunnel_address)
 
     def cleanup_connection(self, sock: socket.socket) -> None:
         """
@@ -198,7 +177,7 @@ class ICMPTunnelServer:
                 else:
                     self.handle_tcp_from_client(sock)
             for connection in self.connections.values():
-                connection.packet_manager.resend_unacknowledged_packets(self.icmp_sock.sendto, self.tunnel_address)
+                connection.packet_manager.resend_unacknowledged_packets(self.icmp_sock.sendto, connection.icmp_address)
 
 
 def parse_arguments() -> argparse.Namespace:

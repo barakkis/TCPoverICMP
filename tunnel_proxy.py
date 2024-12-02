@@ -23,31 +23,7 @@ import socket
 from typing import Tuple, Dict, Optional
 import select
 from utils import ICMP_ECHO_REQUEST, ICMPPacket, build_icmp_request, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, \
-    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, PacketManager, create_icmp_socket, calculate_checksum
-
-
-class Connection:
-    """
-    Represents a single ICMP tunnel client connection.
-    """
-
-    def __init__(self, tcp_sock: socket.socket, sequence: int, expected_seq: int, packet_manager: PacketManager,
-                 icmp_address: Tuple[str, int]) -> None:
-        """
-        Initialize a new Connection instance.
-
-        :param tcp_sock: The socket for the client connection.
-        :param sequence: The current sequence number for outgoing packets.
-        :param expected_seq: The next expected sequence number for incoming packets.
-        :param packet_manager: A PacketManager instance for managing ICMP packets.
-        :param icmp_address: The address of the ICMP connection.
-        """
-        self.tcp_sock: socket.socket = tcp_sock
-        self.sequence: int = sequence
-        self.expected_seq: int = expected_seq
-        self.packet_manager: PacketManager = packet_manager
-        self.reorder_buffer: Dict[int, bytes] = {}
-        self.icmp_address: Tuple[str, int] = icmp_address
+    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, PacketManager, create_icmp_socket, calculate_checksum, Connection
 
 
 class ICMPTunnelProxy:
@@ -132,8 +108,8 @@ class ICMPTunnelProxy:
                         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         client_socket.connect((socket.inet_ntoa(icmp_packet.remote_ip), icmp_packet.remote_port))
                         self.inputs.append(client_socket)
-                        self.connections[key] = Connection(client_socket, icmp_packet.sequence, icmp_packet.sequence,
-                                                           PacketManager(), sender_address)
+                        self.connections[key] = Connection(client_socket, icmp_packet.sequence, PacketManager(),
+                                                           sender_address)
                     # Reorder packets and handle out-of-order delivery
                     if icmp_packet.sequence == self.connections[key].expected_seq:
                         self.connections[key].tcp_sock.send(icmp_packet.payload)
