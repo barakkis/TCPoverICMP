@@ -69,7 +69,7 @@ class ICMPTunnelProxy:
                 del self.connections[key]
         except socket.error as e:
             print(f"Error handling TCP data: {e}")
-            self.cleanup_socket(sock)
+            self.cleanup_connection(sock)
 
     def handle_icmp(self, sock: socket.socket) -> None:
         """
@@ -138,11 +138,11 @@ class ICMPTunnelProxy:
                 return key
         return None
 
-    def cleanup_socket(self, sock: socket.socket) -> None:
+    def cleanup_connection(self, sock: socket.socket) -> None:
         """
-        Clean up and close a socket, removing it from active lists and mappings.
+        Clean up a client connection, removing it from monitored inputs and closing the socket.
 
-        :param sock: The socket to close and remove.
+        :param sock: The client socket to clean up.
         """
         sock.close()
         if sock in self.inputs:
