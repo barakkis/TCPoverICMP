@@ -12,6 +12,7 @@ This module includes:
 
 Classes:
 - PacketManager: Manages packets, tracks acknowledgments, and handles retransmissions.
+- Connection: Represents a single ICMP tunnel client connection.
 - ICMPPacket: Represents an ICMP packet, parsing its attributes from raw data.
 
 Functions:

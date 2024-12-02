@@ -8,7 +8,6 @@ This server uses the `select` mechanism to manage multiple connections concurren
 - Receiving ICMP packets and forwarding their payload to the appropriate TCP client.
 
 Classes:
-- Connection: Represents a single ICMP tunnel client connection.
 - ICMPTunnelProxy: Implements the proxy server functionality.
 
 Functions:
