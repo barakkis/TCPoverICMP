@@ -19,13 +19,16 @@ Main Execution:
 
 import argparse
 import socket
-from typing import Tuple, Dict, Optional
+from typing import Tuple, Optional
+
 import select
-from utils import ICMP_ECHO_REQUEST, ICMPPacket, build_icmp_request, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, \
-    ACK_PACKET_ID, send_icmp, DATA_PACKET_ID, PacketManager, create_icmp_socket, calculate_checksum, Connection
+
+from icmp_utils import ICMP_ECHO_REQUEST, ICMPPacket, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, \
+    ACK_PACKET_ID, ICMP_PACKET_OFFSET
+from tunnel_utils import ICMPTunnelEndpoint, Connection, PacketManager
 
 
-class ICMPTunnelProxy:
+class ICMPTunnelProxy(ICMPTunnelEndpoint):
     """
     A proxy server that forwards data between TCP clients and a remote server using ICMP packets for tunneling.
     """
@@ -36,39 +39,28 @@ class ICMPTunnelProxy:
 
         :param buffer_size: Size of the buffer for receiving data from sockets.
         """
-        self.buffer_size: int = buffer_size
-        self.icmp_sock: socket.socket = create_icmp_socket()
+        super().__init__(buffer_size, ICMP_ECHO_REPLY)
 
-        self.inputs: list[socket.socket] = [self.icmp_sock]  # List of sockets to monitor for incoming data
-        self.connections: Dict[Tuple[str, int], Connection] = {}
-
-    def handle_tcp(self, sock: socket.socket) -> None:
+    def handle_tcp(self, sock) -> None:
         """
         Handle incoming TCP data, forwarding it through ICMP to the corresponding remote server.
 
         :param sock: The TCP socket associated with a specific client.
         """
         try:
-            data: bytes = sock.recv(self.buffer_size)
+            data = sock.recv(self.buffer_size)
             key = self.get_key_connection_by_tcp_socket(sock)
             if data:
                 connection = self.connections[key]
-                # Build an ICMP packet with the received TCP data
-                packet = build_icmp_request(data, ICMP_ECHO_REPLY, *key, *sock.getpeername(), DATA_PACKET_ID,
-                                            connection.sequence)
-
-                connection.packet_manager.track_packet(connection.sequence, packet)
-                self.icmp_sock.sendto(packet, connection.icmp_address)
-                print(f"Packet {connection.sequence} sent")
-                connection.sequence += 1
+                self.send_data_packet(data, connection, *key, *sock.getpeername())
             else:
                 # Client disconnected
-                print(f"Client disconnected: {sock.getsockname()}")
-                self.inputs.remove(sock)
-                del self.connections[key]
+                print("Client disconnected")
+                self.cleanup_connection(sock)
+
         except socket.error as e:
             print(f"Error handling TCP data: {e}")
-            self.cleanup_connection(sock)
+            self.inputs.remove(sock)
 
     def handle_icmp(self, sock: socket.socket) -> None:
         """
@@ -78,11 +70,11 @@ class ICMPTunnelProxy:
         """
         try:
             data, sender_address = sock.recvfrom(ICMP_BUFFER_SIZE)
-            icmp_data = data[20:]
+            icmp_data = data[ICMP_PACKET_OFFSET:]
             icmp_packet = ICMPPacket(icmp_data)
 
             if icmp_packet.icmp_type == ICMP_ECHO_REQUEST:
-                print(f"Received ICMP packet from: {sender_address}")
+                print(f"Received ICMP packet")
                 key: Tuple[str, int] = (socket.inet_ntoa(icmp_packet.local_ip), icmp_packet.local_port)
                 if icmp_packet.packet_id == ACK_PACKET_ID:
                     if key not in self.connections.keys():
@@ -92,15 +84,7 @@ class ICMPTunnelProxy:
                     self.connections[key].packet_manager.handle_ack(icmp_packet.sequence)
                 else:
                     # Send acknowledgment back to the sender
-                    received_checksum = calculate_checksum(icmp_data)
-                    if received_checksum == 0:
-                        send_icmp(self.icmp_sock, ICMP_ECHO_REPLY, b'', sender_address,
-                                  socket.inet_ntoa(icmp_packet.local_ip), icmp_packet.local_port,
-                                  socket.inet_ntoa(icmp_packet.remote_ip), icmp_packet.remote_port, ACK_PACKET_ID,
-                                  icmp_packet.sequence)
-                    else:
-                        print(f"Error in Checksum to {icmp_packet.sequence} packet, drop it")
-                        return
+                    self.send_ack_packet(icmp_packet, icmp_data, sender_address)
 
                     if key not in self.connections.keys():
                         # Establish a new TCP connection if not already existing
@@ -110,17 +94,7 @@ class ICMPTunnelProxy:
                         self.connections[key] = Connection(client_socket, icmp_packet.sequence, PacketManager(),
                                                            sender_address)
                     # Reorder packets and handle out-of-order delivery
-                    if icmp_packet.sequence == self.connections[key].expected_seq:
-                        self.connections[key].tcp_sock.send(icmp_packet.payload)
-                        self.connections[key].expected_seq += 1
-                        while self.connections[key].expected_seq in self.connections[key].reorder_buffer:
-                            self.connections[key].tcp_sock.send(
-                                self.connections[key].reorder_buffer.pop(self.connections[key].expected_seq))
-                            self.connections[key].expected_seq += 1
-                    else:
-                        self.connections[key].reorder_buffer[icmp_packet.sequence] = icmp_packet.payload
-                        print(f"Packet {icmp_packet.sequence} buffered (waiting for "
-                              f"{self.connections[key].expected_seq})")
+                    self.connections[key].reorder_packets(icmp_packet)
 
         except socket.error as e:
             print(f"Error handling ICMP data: {e}")
@@ -160,13 +134,10 @@ class ICMPTunnelProxy:
             readable, _, _ = select.select(self.inputs, [], [], 0.5)
             for sock in readable:
                 if sock is self.icmp_sock:
-                    # Handle incoming ICMP packet
                     self.handle_icmp(sock)
                 else:
-                    # Handle incoming TCP data
                     self.handle_tcp(sock)
-            for connection in self.connections.values():
-                connection.packet_manager.resend_unacknowledged_packets(self.icmp_sock.sendto, connection.icmp_address)
+            self.resend_unacknowledged_packets()
 
 
 def parse_arguments() -> argparse.Namespace:

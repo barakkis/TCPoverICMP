@@ -1,5 +1,5 @@
 """
-utils.py
+icmp_utils.py
 
 Combined utility functions and classes for managing ICMP packets, handling ICMP-based communication, 
 and creating/managing sockets.
@@ -25,106 +25,20 @@ Functions:
 
 import socket
 import struct
-import time
-from typing import Dict, Tuple
+from typing import Tuple
 
 # ICMP message types
 ICMP_ECHO_REPLY = 0  # ICMP type for Echo Reply messages
 ICMP_ECHO_REQUEST = 8  # ICMP type for Echo Request messages
 
 # Constants
+ICMP_PACKET_OFFSET = 20
 ICMP_BUFFER_SIZE = 65565  # Maximum buffer size for ICMP packets
 MIN_STARTING_SEQUENCE = 0  # Minimum sequence number for packets
 MAX_STARTING_SEQUENCE = 200  # Maximum sequence number for packets
 DATA_PACKET_ID = 1  # Identifier for data packets
 ACK_PACKET_ID = 2  # Identifier for acknowledgment packets
 SOCKET_REUSE = 1  # Value for SO_REUSEADDR to allow address reuse
-
-
-class PacketManager:
-    """
-    Manages ICMP packets for acknowledgment and retransmission.
-    Tracks unacknowledged packets and handles their retransmission based on a timeout.
-    """
-
-    def __init__(self, ack_timeout: int = 2, max_retries: int = 3) -> None:
-        """
-        Initialize the PacketManager.
-
-        :param ack_timeout: Timeout (in seconds) before retransmitting unacknowledged packets.
-        :param max_retries: Maximum number of retransmission attempts.
-        """
-        self.pending_packets: Dict[int, Dict[str, float | bytes | int]] = {}  # Tracks unacknowledged packets
-        self.acknowledged_packets: set[int] = set()  # Tracks acknowledged sequence numbers
-        self.ack_timeout: int = ack_timeout
-        self.max_retries: int = max_retries
-
-    def track_packet(self, seq_number: int, packet: bytes) -> None:
-        """
-        Add a packet to the pending list for tracking.
-
-        :param seq_number: Sequence number of the packet.
-        :param packet: The ICMP packet to track.
-        """
-        self.pending_packets[seq_number] = {
-            "packet": packet,
-            "timestamp": time.time(),
-            "retries": 0
-        }
-
-    def handle_ack(self, seq_number: int) -> None:
-        """
-        Mark a packet as acknowledged and remove it from the pending list.
-
-        :param seq_number: Sequence number of the acknowledged packet.
-        """
-        if seq_number in self.pending_packets:
-            del self.pending_packets[seq_number]
-            self.acknowledged_packets.add(seq_number)
-            print(f"ACK received for packet {seq_number}")
-
-    def resend_unacknowledged_packets(self, send_function, address: Tuple[str, int]) -> None:
-        """
-        Resend packets that haven't been acknowledged within the timeout period.
-
-        :param send_function: Function to send a packet (e.g., `self.icmp_sock.sendto`).
-        :param address: Destination address to send the packets to.
-        """
-        current_time = time.time()
-        for seq_number, packet_info in list(self.pending_packets.items()):
-            if current_time - packet_info["timestamp"] > self.ack_timeout:
-                if packet_info["retries"] < self.max_retries:
-                    send_function(packet_info["packet"], address)
-                    self.pending_packets[seq_number]["timestamp"] = current_time
-                    self.pending_packets[seq_number]["retries"] += 1
-                    print(f"Packet {seq_number} retransmitted. Retry #{packet_info['retries']}")
-                else:
-                    print(f"Packet {seq_number} dropped after {self.max_retries} retries")
-                    del self.pending_packets[seq_number]
-
-
-class Connection:
-    """
-    Represents a ICMP tunnel client connection, including its state and packet management.
-    """
-
-    def __init__(self, tcp_sock: socket.socket, sequence: int, packet_manager: PacketManager,
-                 icmp_address: Tuple[str, int]) -> None:
-        """
-        Initialize a new Connection instance.
-
-        :param tcp_sock: The socket for the client connection.
-        :param sequence: The current sequence number for outgoing packets and the next expected sequence number for
-        incoming packets.
-        :param packet_manager: A PacketManager instance for tracking and retransmitting packets.
-        :param icmp_address: The address of the ICMP connection.
-        """
-        self.tcp_sock: socket.socket = tcp_sock
-        self.sequence: int = sequence
-        self.expected_seq: int = sequence
-        self.packet_manager: PacketManager = packet_manager
-        self.reorder_buffer: Dict[int, bytes] = {}
-        self.icmp_address: Tuple[str, int] = icmp_address
 
 
 class ICMPPacket:
