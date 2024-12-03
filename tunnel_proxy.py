@@ -3,7 +3,7 @@ tunnel_proxy.py
 
 A proxy server that forwards data between TCP clients and a remote server using ICMP packets for tunneling.
 
-This server uses the `select` mechanism to manage multiple connections concurrently. It supports:
+This server uses the `select` mechanism to manage multiple sessions concurrently. It supports:
 - Receiving data from TCP clients and forwarding it via ICMP.
 - Receiving ICMP packets and forwarding their payload to the appropriate TCP client.
 
@@ -25,7 +25,7 @@ import select
 
 from icmp_utils import ICMP_ECHO_REQUEST, ICMPPacket, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, \
     ACK_PACKET_ID, ICMP_PACKET_OFFSET
-from tunnel_utils import ICMPTunnelEndpoint, Connection, PacketManager
+from tunnel_shared import ICMPTunnelEndpoint, Session, PacketManager
 
 
 class ICMPTunnelProxy(ICMPTunnelEndpoint):
@@ -49,14 +49,14 @@ class ICMPTunnelProxy(ICMPTunnelEndpoint):
         """
         try:
             data = sock.recv(self.buffer_size)
-            key = self.get_key_connection_by_tcp_socket(sock)
+            key = self.get_key_session_by_tcp_socket(sock)
             if data:
-                connection = self.connections[key]
-                self.send_data_packet(data, connection, *key, *sock.getpeername())
+                session = self.sessions[key]
+                self.send_data_packet(data, session, *key, *sock.getpeername())
             else:
                 # Client disconnected
                 print("Client disconnected")
-                self.cleanup_connection(sock)
+                self.cleanup_session(sock)
 
         except socket.error as e:
             print(f"Error handling TCP data: {e}")
@@ -77,52 +77,52 @@ class ICMPTunnelProxy(ICMPTunnelEndpoint):
                 print(f"Received ICMP packet")
                 key: Tuple[str, int] = (socket.inet_ntoa(icmp_packet.local_ip), icmp_packet.local_port)
                 if icmp_packet.packet_id == ACK_PACKET_ID:
-                    if key not in self.connections.keys():
-                        print(f"No TCP connection found for ICMP request to {key}")
+                    if key not in self.sessions.keys():
+                        print(f"No TCP session found for ICMP request to {key}")
                         return
                     # Handle acknowledgment
-                    self.connections[key].packet_manager.handle_ack(icmp_packet.sequence)
+                    self.sessions[key].packet_manager.handle_ack(icmp_packet.sequence)
                 else:
                     # Send acknowledgment back to the sender
                     self.send_ack_packet(icmp_packet, icmp_data, sender_address)
 
-                    if key not in self.connections.keys():
-                        # Establish a new TCP connection if not already existing
+                    if key not in self.sessions.keys():
+                        # Establish a new TCP session if not already existing
                         client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                         client_socket.connect((socket.inet_ntoa(icmp_packet.remote_ip), icmp_packet.remote_port))
                         self.inputs.append(client_socket)
-                        self.connections[key] = Connection(client_socket, icmp_packet.sequence, PacketManager(),
-                                                           sender_address)
+                        self.sessions[key] = Session(client_socket, icmp_packet.sequence, PacketManager(),
+                                                     sender_address)
                     # Reorder packets and handle out-of-order delivery
-                    self.connections[key].reorder_packets(icmp_packet)
+                    self.sessions[key].reorder_packets(icmp_packet)
 
         except socket.error as e:
             print(f"Error handling ICMP data: {e}")
 
-    def get_key_connection_by_tcp_socket(self, tcp_sock: socket.socket) -> Optional[Tuple[str, int]]:
+    def get_key_session_by_tcp_socket(self, tcp_sock: socket.socket) -> Optional[Tuple[str, int]]:
         """
-        Retrieve the key for a connection based on its TCP address.
+        Retrieve the key for a session based on its TCP address.
 
-        :param tcp_sock: The socket of the connection.
-        :return: The connection key if found, otherwise None.
+        :param tcp_sock: The socket of the session.
+        :return: The session key if found, otherwise None.
         """
-        for key, connection in self.connections.items():
-            if connection.tcp_sock == tcp_sock:
+        for key, session in self.sessions.items():
+            if session.tcp_sock == tcp_sock:
                 return key
         return None
 
-    def cleanup_connection(self, sock: socket.socket) -> None:
+    def cleanup_session(self, sock: socket.socket) -> None:
         """
-        Clean up a client connection, removing it from monitored inputs and closing the socket.
+        Clean up a client session, removing it from monitored inputs and closing the socket.
 
         :param sock: The client socket to clean up.
         """
         sock.close()
         if sock in self.inputs:
             self.inputs.remove(sock)
-        key = self.get_key_connection_by_tcp_socket(sock)
+        key = self.get_key_session_by_tcp_socket(sock)
         if key is not None:
-            del self.connections[key]
+            del self.sessions[key]
 
     def start_server(self) -> None:
         """

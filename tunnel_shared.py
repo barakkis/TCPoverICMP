@@ -69,9 +69,9 @@ class PacketManager:
                     del self.pending_packets[seq_number]
 
 
-class Connection:
+class Session:
     """
-    Represents a ICMP tunnel client connection, including its state and packet management.
+    Represents a ICMP tunnel client session, including its state and packet management.
     """
 
     def __init__(self, tcp_sock: socket.socket, sequence: int, packet_manager: PacketManager,
@@ -79,11 +79,11 @@ class Connection:
         """
         Initialize a new Connection instance.
 
-        :param tcp_sock: The socket for the client connection.
+        :param tcp_sock: The socket for the client session.
         :param sequence: The current sequence number for outgoing packets and the next expected sequence number for
         incoming packets.
         :param packet_manager: A PacketManager instance for tracking and retransmitting packets.
-        :param icmp_address: The address of the ICMP connection.
+        :param icmp_address: The address of the ICMP session.
         """
         self.tcp_sock: socket.socket = tcp_sock
         self.sequence: int = sequence
@@ -115,7 +115,7 @@ class ICMPTunnelEndpoint(ABC):
         self.icmp_sock: socket.socket = create_icmp_socket()
 
         self.inputs: list[socket.socket] = [self.icmp_sock]  # List of sockets to monitor for incoming data
-        self.connections: Dict[Tuple[str, int], Connection] = {}
+        self.sessions: Dict[Tuple[str, int], Session] = {}
 
     @abstractmethod
     def handle_tcp(self, sock: socket.socket) -> None:
@@ -129,14 +129,14 @@ class ICMPTunnelEndpoint(ABC):
     def start_server(self) -> None:
         pass
 
-    def send_data_packet(self, data: bytes, connection: Connection, local_ip: str, local_port: int, remote_ip: str,
+    def send_data_packet(self, data: bytes, session: Session, local_ip: str, local_port: int, remote_ip: str,
                          remote_port: int):
         packet = build_icmp_request(data, self.icmp_type, local_ip, local_port, remote_ip, remote_port, DATA_PACKET_ID,
-                                    connection.sequence)
-        connection.packet_manager.track_packet(connection.sequence, packet)
-        self.icmp_sock.sendto(packet, connection.icmp_address)
-        print(f"Packet {connection.sequence} sent")
-        connection.sequence += 1
+                                    session.sequence)
+        session.packet_manager.track_packet(session.sequence, packet)
+        self.icmp_sock.sendto(packet, session.icmp_address)
+        print(f"Packet {session.sequence} sent")
+        session.sequence += 1
 
     def send_ack_packet(self, icmp_packet, icmp_data, sender_address):
         if calculate_checksum(icmp_data) == 0:
@@ -149,5 +149,5 @@ class ICMPTunnelEndpoint(ABC):
             return
 
     def resend_unacknowledged_packets(self):
-        for connection in self.connections.values():
-            connection.packet_manager.resend_unacknowledged_packets(self.icmp_sock.sendto, connection.icmp_address)
+        for session in self.sessions.values():
+            session.packet_manager.resend_unacknowledged_packets(self.icmp_sock.sendto, session.icmp_address)
