@@ -1,18 +1,15 @@
 """
-icmp_utils.py
+utils.py
 
-Combined utility functions and classes for managing ICMP packets, handling ICMP-based communication, 
-and creating/managing sockets.
+Combined utility functions and class for managing ICMP packets, handling ICMP-based communication and creating/managing
+sockets.
 
 This module includes:
 - ICMP packet creation and parsing.
-- Packet tracking for retransmission.
 - Utility functions for checksum calculation and packet handling.
 - Creation of ICMP and TCP sockets.
 
 Classes:
-- PacketManager: Manages packets, tracks acknowledgments, and handles retransmissions.
-- Connection: Represents a single ICMP tunnel client connection.
 - ICMPPacket: Represents an ICMP packet, parsing its attributes from raw data.
 
 Functions:
