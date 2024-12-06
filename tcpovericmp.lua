@@ -17,12 +17,24 @@ my_protocol.fields.payload = ProtoField.string("tcpovericmp.payload", "Payload")
 local function calculate_checksum(buffer)
     local checksum = 0
     local length = buffer:len()
-    for i = 0, length - 1, 2 do
+    local i = 0
+
+    -- Sum up 16-bit words
+    while i + 1 < length do
         local word = buffer(i, 2):uint()
         checksum = checksum + word
         checksum = (checksum & 0xFFFF) + (checksum >> 16) -- Handle overflow
+        i = i + 2
     end
-    checksum = ~checksum & 0xFFFF
+
+    -- Handle odd-length buffers
+    if i < length then
+        local last_byte = buffer(i, 1):uint()
+        checksum = checksum + (last_byte << 8) -- Pad the last byte to form a 16-bit word
+        checksum = (checksum & 0xFFFF) + (checksum >> 16)
+    end
+
+    checksum = ~checksum & 0xFFFF -- Final bitwise inversion
     return checksum
 end
 
