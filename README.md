@@ -27,8 +27,7 @@ Before running the scripts, ensure the following:
 
 ## Usage Examples
 
-### Example 1: HTTP Testing with a Proxy Server
-#### Server
+### Example 1: HTTP 
 ```bash
 python3 tunnel_server.py --target-ip www.testingmcafeesites.com --target-port 80 --tunnel-ip PROXY_HOST
 ```
@@ -37,8 +36,7 @@ python3 tunnel_server.py --target-ip www.testingmcafeesites.com --target-port 80
 curl http://127.0.0.1:8000/ -H 'Host: www.testingmcafeesites.com'
 ```
 
-### Example 2: HTTPS Testing with a Proxy Server
-#### Server
+### Example 2: HTTPS
 ```bash
 python3 tunnel_server.py --target-ip google.com --target-port 443 --tunnel-ip PROXY_HOST
 ```
@@ -47,7 +45,7 @@ python3 tunnel_server.py --target-ip google.com --target-port 443 --tunnel-ip PR
 curl -k https://127.0.0.1:8000/index.html -H 'Host: www.google.com'
 ```
 
-### Example 3: FTP Testing with a Proxy Server
+### Example 3: FTP
 #### Server
 ```bash
 python3 tunnel_server.py --target-ip test.rebex.net --target-port 21 --tunnel-ip PROXY_HOST
