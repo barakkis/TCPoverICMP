@@ -27,7 +27,7 @@ import select
 
 from tunnel_shared import ICMPTunnelEndpoint, Session, PacketManager
 from utils import ICMP_ECHO_REPLY, ICMPPacket, ICMP_ECHO_REQUEST, ICMP_BUFFER_SIZE, ACK_PACKET_ID, \
-    MAX_STARTING_SEQUENCE, create_tcp_server_socket, MIN_STARTING_SEQUENCE, ICMP_PACKET_OFFSET
+    MAX_STARTING_SEQUENCE, create_tcp_server_socket, MIN_STARTING_SEQUENCE, ICMP_PACKET_OFFSET, DATA_PACKET_ID
 
 
 class ICMPTunnelServer(ICMPTunnelEndpoint):
@@ -95,7 +95,7 @@ class ICMPTunnelServer(ICMPTunnelEndpoint):
                 if icmp_packet.packet_id == ACK_PACKET_ID:
                     # Handle acknowledgment
                     self.sessions[key].packet_manager.handle_ack(icmp_packet.sequence)
-                else:
+                elif icmp_packet.packet_id == DATA_PACKET_ID:
                     # Send acknowledgment back to the sender
                     self.send_ack_packet(icmp_packet, icmp_data, sender_address)
                     print(icmp_packet.payload)

@@ -24,7 +24,8 @@ from typing import Tuple, Optional
 import select
 
 from tunnel_shared import ICMPTunnelEndpoint, Session, PacketManager
-from utils import ICMP_ECHO_REQUEST, ICMPPacket, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, ACK_PACKET_ID, ICMP_PACKET_OFFSET
+from utils import ICMP_ECHO_REQUEST, ICMPPacket, ICMP_ECHO_REPLY, ICMP_BUFFER_SIZE, ACK_PACKET_ID, ICMP_PACKET_OFFSET, \
+    DATA_PACKET_ID
 
 
 class ICMPTunnelProxy(ICMPTunnelEndpoint):
@@ -80,7 +81,7 @@ class ICMPTunnelProxy(ICMPTunnelEndpoint):
                         return
                     # Handle acknowledgment
                     self.sessions[key].packet_manager.handle_ack(icmp_packet.sequence)
-                else:
+                elif icmp_packet.packet_id == DATA_PACKET_ID:
                     # Send acknowledgment back to the sender
                     self.send_ack_packet(icmp_packet, icmp_data, sender_address)
                     if key not in self.sessions:
